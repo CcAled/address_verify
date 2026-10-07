@@ -208,8 +208,9 @@ async function checkAmap() {
     if (localDistrict && !g.district)
       mismatches.push(`高德未能解析出区县，地址中的「${localDistrict}」可能不存在`);
 
-    let html = badge(precise && !mismatches.length ? 'pass' : (rough || mismatches.length ? 'suspect' : 'pass'),
-                     precise && !mismatches.length ? 'PASS · 地址有效' : 'SUSPECT · 地址存疑');
+    const houseBad = houseNotes.length > 0;
+    let html = badge(precise && !mismatches.length && !houseBad ? 'pass' : (rough || mismatches.length || houseBad ? 'suspect' : 'pass'),
+                     precise && !mismatches.length && !houseBad ? 'PASS · 地址有效' : 'SUSPECT · 地址存疑');
     html += `<div class="detail">
       <div class="kv"><b>匹配条数</b>${count} 条</div>
       <div class="kv"><b>匹配级别</b>${level}</div>
@@ -219,11 +220,26 @@ async function checkAmap() {
       <div class="kv"><b>坐标</b>${g.location}（GCJ-02）</div>
       <div class="kv"><b>adcode</b>${g.adcode}</div>`;
 
+    // ---------- 门牌号合理性与比对 ----------
+    const houseNotes = [];
+    const hm = addr.match(/(\d{1,10})\s*号/);
+    if (hm) {
+      if (hm[1].length > 4)
+        houseNotes.push(`门牌号「${hm[1]}号」位数异常（超过4位），真实门牌极少出现，疑似多写/误写`);
+      const fmtHm = (g.formatted_address.match(/(\d{1,10})\s*号/) || [,''])[1];
+      if (fmtHm && hm[1] !== fmtHm)
+        houseNotes.push(`门牌号被高德纠正：原地址「${hm[1]}号」→ 实际匹配为「${fmtHm}号」，原门牌号很可能写错`);
+    }
+
     if (mismatches.length) {
       html += `<div class="note err">⚠️ 交叉比对矛盾：<br>· ${mismatches.join('<br>· ')}<br>→ 原地址中的行政区划很可能写错（例如把海口的区写到了三亚）</div>`;
-    } else if (precise) {
+    }
+    if (houseNotes.length) {
+      html += `<div class="note warn">⚠️ 门牌号问题：<br>· ${houseNotes.join('<br>· ')}</div>`;
+    }
+    if (!mismatches.length && !houseNotes.length && precise) {
       html += `<div class="note ok">✔ 可定位到「${level}」级，地址真实可信</div>`;
-    } else if (rough) {
+    } else if (!mismatches.length && !houseNotes.length && rough) {
       html += `<div class="note warn">⚠ 只能粗定位到「${level}」级，说明路名/门牌/小区在高德库中不存在，建议人工核对</div>`;
     }
     if (count > 1) html += `<div class="note warn">ℹ 返回多条候选地址，可在“格式化地址”中确认是否第一条即期望位置</div>`;
