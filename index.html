@@ -208,6 +208,17 @@ async function checkAmap() {
     if (localDistrict && !g.district)
       mismatches.push(`高德未能解析出区县，地址中的「${localDistrict}」可能不存在`);
 
+    // ---------- 门牌号合理性与比对 ----------
+    const houseNotes = [];
+    const hm = addr.match(/(\d{1,10})\s*号/);
+    if (hm) {
+      if (hm[1].length > 4)
+        houseNotes.push(`门牌号「${hm[1]}号」位数异常（超过4位），真实门牌极少出现，疑似多写/误写`);
+      const fmtHm = (g.formatted_address.match(/(\d{1,10})\s*号/) || [,''])[1];
+      if (fmtHm && hm[1] !== fmtHm)
+        houseNotes.push(`门牌号被高德纠正：原地址「${hm[1]}号」→ 实际匹配为「${fmtHm}号」，原门牌号很可能写错`);
+    }
+
     const houseBad = houseNotes.length > 0;
     let html = badge(precise && !mismatches.length && !houseBad ? 'pass' : (rough || mismatches.length || houseBad ? 'suspect' : 'pass'),
                      precise && !mismatches.length && !houseBad ? 'PASS · 地址有效' : 'SUSPECT · 地址存疑');
@@ -219,17 +230,6 @@ async function checkAmap() {
       <div class="kv"><b>乡镇/街道</b>${g.township || '—'}</div>
       <div class="kv"><b>坐标</b>${g.location}（GCJ-02）</div>
       <div class="kv"><b>adcode</b>${g.adcode}</div>`;
-
-    // ---------- 门牌号合理性与比对 ----------
-    const houseNotes = [];
-    const hm = addr.match(/(\d{1,10})\s*号/);
-    if (hm) {
-      if (hm[1].length > 4)
-        houseNotes.push(`门牌号「${hm[1]}号」位数异常（超过4位），真实门牌极少出现，疑似多写/误写`);
-      const fmtHm = (g.formatted_address.match(/(\d{1,10})\s*号/) || [,''])[1];
-      if (fmtHm && hm[1] !== fmtHm)
-        houseNotes.push(`门牌号被高德纠正：原地址「${hm[1]}号」→ 实际匹配为「${fmtHm}号」，原门牌号很可能写错`);
-    }
 
     if (mismatches.length) {
       html += `<div class="note err">⚠️ 交叉比对矛盾：<br>· ${mismatches.join('<br>· ')}<br>→ 原地址中的行政区划很可能写错（例如把海口的区写到了三亚）</div>`;
